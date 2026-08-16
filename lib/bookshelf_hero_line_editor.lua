@@ -264,6 +264,7 @@ function LineEditor.show(region_key, bw, settings_module, touchmenu_instance)
         line_height = current.line_height,
         bar_height  = current.bar_height,
         bar_style   = current.bar_style,
+        max_lines   = current.max_lines,
     }
 
     local dialog
@@ -356,7 +357,38 @@ function LineEditor.show(region_key, bw, settings_module, touchmenu_instance)
 
         rows[#rows + 1] = style_row
 
-        -- Row 2: progress-region-only bar controls. Spacer is an edge-case
+        -- Row 2: description-region-only line cap. Without it the blurb takes
+        -- every pixel of slack left in the hero, which is right when the
+        -- description IS the card and wrong when it's meant to be a taster
+        -- above other lines. 0 = no limit, i.e. the original behaviour, so the
+        -- button reads "all" rather than a number until the user opts in.
+        if region_key == "description" then
+            rows[#rows + 1] = {
+                {
+                    text_func = function()
+                        local n = tonumber(draft.max_lines)
+                        if not n or n <= 0 then return _("Lines: all") end
+                        return _("Lines: ") .. n
+                    end,
+                    callback = function()
+                        if dialog then dialog:onCloseKeyboard() end
+                        showSizeNudge(tonumber(draft.max_lines) or 0, 0,
+                            function(val)
+                                -- Store nil rather than 0 for "no limit" so the
+                                -- entry falls back to the default instead of
+                                -- persisting a magic number.
+                                draft.max_lines = (val > 0) and val or nil
+                                applyLivePreview()
+                            end,
+                            function() if dialog then dialog:reinit() end end,
+                            { min = 0, max = 20, step_small = 1, step_big = 3,
+                              unit = "", title = _("Description lines (0 = no limit)") })
+                    end,
+                },
+            }
+        end
+
+        -- Row 3: progress-region-only bar controls. Spacer is an edge-case
         -- token reachable via the Tokens picker, not surfaced as a button
         -- here -- adding a "+ Spacer" toggle to every region's editor made
         -- the row noisy out of proportion to how often anyone needs it.
@@ -454,6 +486,7 @@ function LineEditor.show(region_key, bw, settings_module, touchmenu_instance)
                 draft.line_height = d.line_height
                 draft.bar_height  = d.bar_height
                 draft.bar_style   = d.bar_style
+                draft.max_lines   = d.max_lines
                 if dialog and dialog.setInputText then dialog:setInputText(d.template) end
                 applyLivePreview()
                 if dialog then dialog:reinit() end

@@ -74,6 +74,11 @@ Regions.DEFAULTS = {
         bold      = false,
         alignment = "left",
         -- no `uppercase` — would be hostile on a long blurb
+        -- max_lines: cap the blurb at N lines and ellipsise the rest (the
+        -- "Lines" button in the line editor). nil = the previous behaviour,
+        -- where the description takes all the slack left between the lines
+        -- above it and the ones below.
+        max_lines = nil,
     },
     progress = {
         template   = "[if:page_num]%page_num / %page_count[else]%book_pct[/if]  %bar  [if:book_time_left]%book_time_left LEFT[/if]",

@@ -870,6 +870,18 @@ function HeroCard:_buildRightColumn(book, regions, state, dimen)
             local desc_face  = regionFace(regions.description)
             local desc_bold  = regions.description.bold or false
             local desc_align = regions.description.alignment or "left"
+            -- Optional line cap: show the first N lines and ellipsise the rest,
+            -- instead of letting the blurb take every pixel of slack. Applied to
+            -- the shared budget, so N counts lines across the whole description
+            -- (paragraph breaks included) rather than per paragraph -- what the
+            -- reader sees is N lines of text, which is the point of the setting.
+            -- The 1.3 mirrors line_height = 0.3 on the TextBoxWidgets below;
+            -- both are pinned so a change in one is visible against the other.
+            local max_lines = tonumber(regions.description.max_lines)
+            if max_lines and max_lines > 0 then
+                local line_h = desc_face.size * 1.3
+                available = math.min(available, math.floor(max_lines * line_h + 0.5))
+            end
             -- ~40% of body font size — enough to mark a paragraph onset
             -- without eating a full empty line (which would be 1.3× the
             -- font size and cost too much of the limited slot).
