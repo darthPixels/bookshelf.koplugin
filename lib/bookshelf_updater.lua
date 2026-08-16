@@ -89,8 +89,12 @@ function Updater.composeBranchUrl(branch)
     local encoded = branch:gsub("[^%w%-_/.~]", function(c)
         return string.format("%%%02X", c:byte())
     end)
+    -- FORK-LOCAL: points at this fork, not upstream, so "Developer updates"
+    -- installs branches pushed here. Never send this line upstream. Only the
+    -- branch endpoint is redirected -- release checks below stay on AndyHazz,
+    -- so stable updates and "Reset to latest stable release" still work.
     return string.format(
-        "https://api.github.com/repos/AndyHazz/bookshelf.koplugin/zipball/%s",
+        "https://api.github.com/repos/darthPixels/bookshelf.koplugin/zipball/%s",
         encoded)
 end
 
