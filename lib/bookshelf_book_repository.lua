@@ -575,22 +575,26 @@ local function _calibreMetadataFor(filepath)
 end
 
 -- ─── Published year ──────────────────────────────────────────────────────────
--- Calibre records the publication date as ISO-8601 ("2005-07-15T22:00:00+00:00");
--- we keep only the year, which is what a shelf ever shows. Calibre is the sole
--- source: KOReader's BookInfoManager has no publication-date column, so a
--- non-Calibre library simply has no year and the token renders empty.
+-- Two sources, in this order:
 --
--- Books whose date Calibre doesn't know carry its UNDEFINED_DATE sentinel --
--- year 101 -- which must read as "no date" rather than as a book from
--- antiquity. Anything below 1000 is treated as that sentinel; the oldest
--- printed book in a real library postdates it by centuries, so the cut-off
--- costs nothing real.
-local function _pubYear(cb)
-    local d = cb and cb.pubdate
-    if type(d) ~= "string" then return nil end
-    local y = tonumber(d:match("^(%d+)%-"))
-    if not y or y < 1000 then return nil end
-    return tostring(y)
+--   1. Calibre's `pubdate`, when a metadata.calibre happens to carry one.
+--   2. The book's own <dc:date>, read straight out of the EPUB.
+--
+-- (2) is not a fallback for exotic cases, it is the one that usually fires:
+-- the metadata.calibre Calibre writes onto a DEVICE is a short form without
+-- pubdate at all (measured on a 559-book library: zero entries had one), while
+-- every EPUB in that same library carried <dc:date>. (1) stays first because a
+-- user-curated Calibre date should still win where it exists, and reading it
+-- costs nothing once the file is parsed.
+--
+-- See lib/bookshelf_pubyear.lua for the parsing and the archive access, and
+-- for why KOReader can't supply this itself (crengine never parses dc:date).
+local PubYear = require("lib/bookshelf_pubyear")
+
+local function _pubYear(cb, filepath)
+    local y = PubYear.yearFromISO(cb and cb.pubdate)
+    if y then return y end
+    return PubYear.fromEpub(filepath)
 end
 
 -- ─── buildBook ────────────────────────────────────────────────────────────────
@@ -871,10 +875,10 @@ function Repo.buildBookMeta(filepath, opts)
         cover_sizetag = info.cover_sizetag,
         lang        = (cb and type(cb.languages) == "table" and cb.languages[1])
                        or info.language,
-        -- Calibre-only (see _pubYear above): BIM has no publication-date
-        -- column, so this stays nil without a metadata.calibre and
-        -- %published_year renders empty.
-        published_year = _pubYear(cb),
+        -- Calibre's date when there is one, else the book's own <dc:date>
+        -- (see _pubYear above). Cached per file, misses included, so a shelf
+        -- repaint doesn't re-open the same archives.
+        published_year = _pubYear(cb, filepath),
         -- A description the OPDS download flow saved for this file wins: the
         -- catalog's blurb is why the user can see one at all for a Gutenberg
         -- book (its embedded EPUB description is usually empty). Falls through
