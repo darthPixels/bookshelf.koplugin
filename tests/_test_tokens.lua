@@ -60,6 +60,7 @@ local function bookFixture()
         filename = "dune",
         lang = "en",
         format = "EPUB",
+        published_year = "1965",
     }
 end
 
@@ -75,6 +76,27 @@ end)
 test("metadata: literal text passes through", function()
     eq(Tokens.expand("Reading %title by %author.", bookFixture()),
        "Reading Dune by Frank Herbert.")
+end)
+test("metadata: %published_year", function()
+    eq(Tokens.expand("%published_year", bookFixture()), "1965")
+end)
+-- Non-Calibre libraries have no year at all (BIM has no such column), so the
+-- token must vanish rather than render "nil" -- and stay gateable.
+test("metadata: %published_year is empty without Calibre metadata", function()
+    local b = bookFixture(); b.published_year = nil
+    eq(Tokens.expand("%published_year", b), "")
+end)
+test("metadata: %published_year gates via [if:]", function()
+    eq(Tokens.expand("[if:published_year](%published_year)[/if]", bookFixture()),
+       "(1965)")
+    local b = bookFixture(); b.published_year = nil
+    eq(Tokens.expand("[if:published_year](%published_year)[/if]", b), "")
+end)
+-- %published_year must not be shadowed by a shorter token sharing its prefix;
+-- expansion runs longest-name-first, and this pins that ordering.
+test("metadata: %published_year survives alongside other tokens", function()
+    eq(Tokens.expand("%series_name #%series_num, %published_year", bookFixture()),
+       "Dune #1, 1965")
 end)
 test("metadata: %hardcover_rating formats cached rating", function()
     local b = bookFixture(); b.hardcover_rating = 4.5

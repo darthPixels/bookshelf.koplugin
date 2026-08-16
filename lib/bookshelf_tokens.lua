@@ -74,6 +74,7 @@ Tokens.CATALOGUE = {
     { category = "Book",     token = "%quote",            description = _("A random highlight from this book") },
     { category = "Book",     token = "%quote_source",     description = _("The book and author for %quote") },
     { category = "Book",     token = "%lang",             description = _("Language") },
+    { category = "Book",     token = "%published_year",   description = _("Publication year (needs Calibre metadata)") },
     { category = "Progress", token = "%book_pct",         description = _("Percent read") },
     { category = "Progress", token = "%book_pct_left",    description = _("Percent left") },
     { category = "Progress", token = "%page_num",         description = _("Current page") },
@@ -210,6 +211,8 @@ Tokens.expanders.series_num  = metaToken("series_num")
 Tokens.expanders.filename    = metaToken("filename")
 Tokens.expanders.lang        = metaToken("lang")
 Tokens.expanders.format      = metaToken("format")
+-- Empty for non-Calibre libraries, so [if:published_year]…[/if] gates it.
+Tokens.expanders.published_year = metaToken("published_year")
 -- %rating -> N filled stars + (5-N) empty stars. Rating is stored
 -- 1-5 (integer) in the DocSettings summary; book.rating is hydrated
 -- by Repo.readProgress via buildBook. Returns empty for unrated /

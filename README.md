@@ -654,6 +654,7 @@ Tokens are placeholders prefixed with `%`. Conditional logic uses `[if:cond]…[
 | `%filename` | *The_Great_Gatsby* |
 | `%format` | *EPUB* |
 | `%lang` | *en* |
+| `%published_year` | *1965* (from Calibre's publication date; empty without a `metadata.calibre`, so gate it with `[if:published_year]`) |
 | `%description` | Book blurb (HTML stripped, entities decoded) |
 | `%quote` | A random highlight from this book, in quotation marks (a fresh one each time you select the book; empty if the book has no highlights). Handy in the Description section in place of the blurb. |
 | `%quote_source` | The book and author for `%quote` |

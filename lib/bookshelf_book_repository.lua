@@ -574,6 +574,25 @@ local function _calibreMetadataFor(filepath)
     return map[filepath]
 end
 
+-- ─── Published year ──────────────────────────────────────────────────────────
+-- Calibre records the publication date as ISO-8601 ("2005-07-15T22:00:00+00:00");
+-- we keep only the year, which is what a shelf ever shows. Calibre is the sole
+-- source: KOReader's BookInfoManager has no publication-date column, so a
+-- non-Calibre library simply has no year and the token renders empty.
+--
+-- Books whose date Calibre doesn't know carry its UNDEFINED_DATE sentinel --
+-- year 101 -- which must read as "no date" rather than as a book from
+-- antiquity. Anything below 1000 is treated as that sentinel; the oldest
+-- printed book in a real library postdates it by centuries, so the cut-off
+-- costs nothing real.
+local function _pubYear(cb)
+    local d = cb and cb.pubdate
+    if type(d) ~= "string" then return nil end
+    local y = tonumber(d:match("^(%d+)%-"))
+    if not y or y < 1000 then return nil end
+    return tostring(y)
+end
+
 -- ─── buildBook ────────────────────────────────────────────────────────────────
 -- Constructs a Book record for a given filepath.
 -- Fields follow spec §5.1. Metadata from BookInfoManager; position from
@@ -852,6 +871,10 @@ function Repo.buildBookMeta(filepath, opts)
         cover_sizetag = info.cover_sizetag,
         lang        = (cb and type(cb.languages) == "table" and cb.languages[1])
                        or info.language,
+        -- Calibre-only (see _pubYear above): BIM has no publication-date
+        -- column, so this stays nil without a metadata.calibre and
+        -- %published_year renders empty.
+        published_year = _pubYear(cb),
         -- A description the OPDS download flow saved for this file wins: the
         -- catalog's blurb is why the user can see one at all for a Gutenberg
         -- book (its embedded EPUB description is usually empty). Falls through
