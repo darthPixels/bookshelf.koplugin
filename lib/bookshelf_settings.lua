@@ -409,13 +409,6 @@ function Settings:_heroSubItems(keys)
                 return not Regions.read()[key].disabled
             end,
             callback = function(touchmenu_instance)
-                -- Rating is an interactive widget, not a text-templated
-                -- region — a line editor for it is meaningless. Tap toggles
-                -- enabled, same as hold elsewhere.
-                if key == "rating" then
-                    self:_toggleRegionEnabled(key, touchmenu_instance)
-                    return
-                end
                 self:_editHeroRegion(key, touchmenu_instance)
             end,
             hold_callback = function(touchmenu_instance)
@@ -434,10 +427,103 @@ function Settings:_heroSubItems(keys)
             item.sub_item_table_func = function()
                 return self:_tagsRegionSubItems()
             end
+        elseif key == "rating" then
+            -- Rating is interactive too, and its region carries a font_size
+            -- that the renderer maps to the star glyph size -- but the row was
+            -- a bare on/off toggle, so that size had no way in and the stars
+            -- were stuck at the default. Same submenu treatment as tags.
+            item.checked_func   = nil
+            item.callback       = nil
+            item.hold_callback  = nil
+            item.sub_item_table_func = function()
+                return self:_ratingRegionSubItems()
+            end
         end
         items[#items + 1] = item
     end
     return items
+end
+
+-- _ratingRegionSubItems() — the "Rating (interactive)" configuration submenu.
+-- Enable switch, star size and alignment. Mirrors _tagsRegionSubItems: the
+-- region is drawn as widgets rather than text, so the line editor is
+-- meaningless for it, but it still has settings worth reaching.
+--
+-- The size control writes `font_size`, which the hero renderer turns into the
+-- star glyph size (at 1.25x for the interactive stars, 1x for Hardcover's).
+-- That mapping predates this menu -- the value simply had no way in.
+function Settings:_ratingRegionSubItems()
+    local Regions = require("lib/bookshelf_hero_regions")
+    local function setRatingField(field, value, touchmenu_instance)
+        local snap = Regions.snapshot("rating") or {}
+        snap[field] = value
+        Regions.write("rating", snap)
+        if self._bw and self._bw._swapHeroInPlace then
+            self._bw:_swapHeroInPlace()
+        end
+        if touchmenu_instance and touchmenu_instance.updateItems then
+            touchmenu_instance:updateItems()
+        end
+    end
+    local function alignmentRow(value, label)
+        return {
+            text = label,
+            radio = true,
+            checked_func = function()
+                return (Regions.read().rating.alignment or "left") == value
+            end,
+            keep_menu_open = true,
+            callback = function(touchmenu_instance)
+                setRatingField("alignment", value, touchmenu_instance)
+            end,
+        }
+    end
+    return {
+        {
+            text = _("Show rating line"),
+            checked_func = function() return not Regions.read().rating.disabled end,
+            keep_menu_open = true,
+            separator = true,
+            callback = function(touchmenu_instance)
+                setRatingField("disabled", not Regions.read().rating.disabled,
+                               touchmenu_instance)
+            end,
+        },
+        {
+            text_func = function()
+                return _("Star size") .. ": "
+                    .. tostring(Regions.read().rating.font_size or 16)
+            end,
+            keep_menu_open = true,
+            callback = function(touchmenu_instance)
+                -- Same nudge dialog as the tags font size: hide the settings
+                -- menu so the live hero is visible while nudging, reopen this
+                -- submenu when it closes.
+                local LineEditor  = require("lib/bookshelf_hero_line_editor")
+                local restoreMenu = LineEditor.hideParentMenu(touchmenu_instance)
+                local cur     = Regions.read().rating.font_size or 16
+                local default = Regions.DEFAULTS.rating.font_size or 16
+                LineEditor.showSizeNudge(
+                    cur, default,
+                    function(val) setRatingField("font_size", val) end,
+                    function() restoreMenu() end,
+                    { title = _("Star size") })
+            end,
+        },
+        {
+            text_func = function()
+                local a = Regions.read().rating.alignment or "left"
+                local labels = { left = _("Left"), center = _("Centre"), right = _("Right") }
+                return _("Alignment") .. ": " .. (labels[a] or labels.left)
+            end,
+            keep_menu_open = true,
+            sub_item_table = {
+                alignmentRow("left",   _("Left")),
+                alignmentRow("center", _("Centre")),
+                alignmentRow("right",  _("Right")),
+            },
+        },
+    }
 end
 
 -- _tagsRegionSubItems() — the "Tags (interactive)" configuration submenu
