@@ -93,8 +93,18 @@ function Updater.composeBranchUrl(branch)
     -- installs branches pushed here. Never send this line upstream. Only the
     -- branch endpoint is redirected -- release checks below stay on AndyHazz,
     -- so stable updates and "Reset to latest stable release" still work.
+    --
+    -- codeload directly instead of api.github.com/zipball: the API endpoint
+    -- counts against the unauthenticated rate limit (60/hour PER IP), which the
+    -- device shares with every other GitHub call from the same network. During a
+    -- development session that budget is gone quickly, and the install then fails
+    -- with a bare "Could not install branch" -- the download returns 429 (or a
+    -- 502), the error page lands in the zip file, and unpacking dies. The zipball
+    -- endpoint only ever redirects here anyway, so this skips the throttled hop
+    -- and asks the download host straight out. Measured 17.08.2026: API 429,
+    -- codeload 200 for the same branch, seconds apart.
     return string.format(
-        "https://api.github.com/repos/darthPixels/bookshelf.koplugin/zipball/%s",
+        "https://codeload.github.com/darthPixels/bookshelf.koplugin/zip/refs/heads/%s",
         encoded)
 end
 

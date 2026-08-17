@@ -47,8 +47,11 @@ local Updater = dofile("lib/bookshelf_updater.lua")
 local t = dofile("tests/_helpers.lua").runner()
 
 -- ── composeBranchUrl ────────────────────────────────────────────────────────
--- FORK-LOCAL: mirrors the redirected branch endpoint in bookshelf_updater.
-local BASE = "https://api.github.com/repos/darthPixels/bookshelf.koplugin/zipball/"
+-- FORK-LOCAL: mirrors the redirected branch endpoint in bookshelf_updater --
+-- codeload rather than the rate-limited api.github.com/zipball (see the comment
+-- on composeBranchUrl). refs/heads/ is part of the base: the caller passes a
+-- branch name, and the encoder must leave its slashes alone for feature/foo.
+local BASE = "https://codeload.github.com/darthPixels/bookshelf.koplugin/zip/refs/heads/"
 
 t.test("composeBranchUrl: plain branch passes through", function()
     assert(Updater.composeBranchUrl("master") == BASE .. "master")
