@@ -145,6 +145,29 @@ test("shelf: missing state yields empty, not nil", function()
     eq(Tokens.expand("%shelf_pos%shelf_total", bookFixture()), "")
 end)
 
+-- %library_total is the whole library and must NOT follow the shelf: the status
+-- line reports global state, so a count that shrank under a filter would be
+-- reporting something else than it claims.
+test("library: %library_total ignores the shelf count", function()
+    local st = shelfState(1, 37, { "/b/a.epub" })   -- filtered shelf: 37
+    st.library_total = 545                           -- library: 545
+    eq(Tokens.expand("%library_total", bookFixture(), st), "545")
+    eq(Tokens.expand("%shelf_total", bookFixture(), st), "37")
+end)
+
+test("library: %library_total is empty when unknown", function()
+    eq(Tokens.expand("%library_total", bookFixture(), {}), "")
+    eq(Tokens.expand("%library_total", bookFixture()), "")
+end)
+
+-- The status-line template the user actually wants.
+test("library: \"Book 3 of 545\" for the status line", function()
+    local b = bookFixture(); b.filepath = "/b/third.epub"
+    local st = shelfState(1, 545, { "/b/a.epub", "/b/b.epub", "/b/third.epub" })
+    st.library_total = 545
+    eq(Tokens.expand("Book %shelf_pos of %library_total", b, st), "Book 3 of 545")
+end)
+
 test("metadata: %hardcover_rating formats cached rating", function()
     local b = bookFixture(); b.hardcover_rating = 4.5
     eq(Tokens.expand("%hardcover_rating", b), "4.5")

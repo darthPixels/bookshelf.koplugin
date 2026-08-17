@@ -2969,6 +2969,13 @@ local function _readSlowState(now)
             end
         end
     end
+    -- Library size for %library_total: every book in the library, independent
+    -- of the active chip or filter. Belongs in the SLOW tier -- the number only
+    -- moves when books are added or removed, and although getAllFilepaths sits
+    -- on the cached directory walk it still builds a fresh path list per call,
+    -- which has no business running on every status-line repaint.
+    local ok_lib, n = pcall(function() return #Repo.getAllFilepaths() end)
+    if ok_lib and type(n) == "number" then out.library_total = n end
     _device_slow_cache      = out
     _device_slow_expires_at = now + DEVICE_SLOW_TTL
     return out
@@ -3061,6 +3068,7 @@ function BookshelfWidget:_buildDeviceState()
         mem      = slow.mem,
         ram_mib  = slow.ram_mib,
         disk_free= slow.disk_free,
+        library_total = slow.library_total,
     }
     _device_state_expires_at = now + DEVICE_STATE_TTL
     return self:_stampShelfPosition(_device_state_cache)

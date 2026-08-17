@@ -76,7 +76,8 @@ Tokens.CATALOGUE = {
     { category = "Book",     token = "%lang",             description = _("Language") },
     { category = "Book",     token = "%published_year",   description = _("Publication year (needs Calibre metadata)") },
     { category = "Book",     token = "%shelf_pos",        description = _("Position of this book in the current shelf (e.g. 3)") },
-    { category = "Book",     token = "%shelf_total",      description = _("Number of books in the current shelf (e.g. 545)") },
+    { category = "Book",     token = "%shelf_total",      description = _("Books in the current shelf — follows chip and filter") },
+    { category = "Device",   token = "%library_total",    description = _("Books in the whole library — ignores chip and filter") },
     { category = "Progress", token = "%book_pct",         description = _("Percent read") },
     { category = "Progress", token = "%book_pct_left",    description = _("Percent left") },
     { category = "Progress", token = "%page_num",         description = _("Current page") },
@@ -245,6 +246,15 @@ end
 
 Tokens.expanders.shelf_total = function(_book, state)
     local n = type(state) == "table" and tonumber(state.shelf_total)
+    return n and tostring(n) or ""
+end
+
+-- %library_total -- every book in the library, whatever the shelf is currently
+-- showing. This is the one for a status line: that strip reports global state
+-- (clock, battery, wifi), so a book count that shrank to 37 whenever a filter
+-- was active would be reporting something else entirely.
+Tokens.expanders.library_total = function(_book, state)
+    local n = type(state) == "table" and tonumber(state.library_total)
     return n and tostring(n) or ""
 end
 -- %rating -> N filled stars + (5-N) empty stars. Rating is stored
