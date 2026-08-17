@@ -1219,6 +1219,26 @@ function Repo.getCurrent()
     return Repo.buildBook(fp)
 end
 
+-- The book the hero is currently showing, as a plain path.
+--
+-- Exists for OTHER plugins: the shelf widget is a local inside main.lua, so
+-- from outside there is no way to ask "which book is on screen right now?".
+-- lastfile is not an answer -- that only changes when a book is actually
+-- opened, while the hero follows every tap on a cover.
+--
+-- Set from _buildHero, which is the single place every route into the hero
+-- passes through (tap, restore, chip switch, selection); read by anything that
+-- wants to act on the selected book without opening it.
+local _previewed_fp = nil
+
+function Repo.setPreviewed(filepath)
+    _previewed_fp = type(filepath) == "string" and filepath or nil
+end
+
+function Repo.getPreviewed()
+    return _previewed_fp
+end
+
 -- Repo.currentFilepath() — the filepath getCurrent() would build, or nil,
 -- WITHOUT touching BIM / DocSettings. Lets callers (the hero memo) key on
 -- the current book without paying the lockable getBookInfo read just to

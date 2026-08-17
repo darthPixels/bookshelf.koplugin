@@ -3327,6 +3327,10 @@ function BookshelfWidget:_buildHero(content_w, hero_cover_w, hero_cover_h, hero_
     else
         current = self:_currentHeroBook()
     end
+    -- Publish what the hero shows, so other plugins can act on the selected
+    -- book without it being open. Both branches meet here, so tap-to-preview
+    -- and "no selection, showing the last-read book" are both covered.
+    Repo.setPreviewed(current and current.filepath)
     local _perf_t1 = _gettime()
     -- Remote catalog records have no file behind them: enrichStats would
     -- DocSettings:open() and then util.partialMD5 an OPDS:// pseudo-path
