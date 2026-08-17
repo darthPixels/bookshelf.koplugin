@@ -75,6 +75,7 @@ Tokens.CATALOGUE = {
     { category = "Book",     token = "%quote_source",     description = _("The book and author for %quote") },
     { category = "Book",     token = "%lang",             description = _("Language") },
     { category = "Book",     token = "%published_year",   description = _("Publication year (needs Calibre metadata)") },
+    { category = "Book",     token = "%blank",            description = _("Blank line — an empty section is hidden, this one isn't") },
     { category = "Device",   token = "%library_book",     description = _("This book's number in the library, oldest transfer first (e.g. 58)") },
     { category = "Device",   token = "%library_total",    description = _("Books in the whole library (e.g. 545)") },
     { category = "Progress", token = "%book_pct",         description = _("Percent read") },
@@ -215,6 +216,21 @@ Tokens.expanders.lang        = metaToken("lang")
 Tokens.expanders.format      = metaToken("format")
 -- Empty for non-Calibre libraries, so [if:published_year]…[/if] gates it.
 Tokens.expanders.published_year = metaToken("published_year")
+
+-- %blank -- a section that renders as an empty line.
+--
+-- A section whose text comes out empty is SKIPPED entirely (Tokens.isEmpty ->
+-- no paint), which is right: a book without a series shouldn't leave a gap
+-- where its series line would be. The cost is that there is no way to ask for
+-- deliberate space between two sections -- and people were reaching for "..."
+-- as a stand-in, which shows up as three dots.
+--
+-- A no-break space is the answer: Lua's %s covers ASCII whitespace only, so
+-- U+00A0 does not match isEmpty's "^%s*$" and the section survives to be
+-- painted, while rendering as nothing visible. The gap's height is then the
+-- section's own font size -- i.e. adjustable with the Size button, which is
+-- exactly the control you'd want for a spacer.
+Tokens.expanders.blank = function() return "\xC2\xA0" end
 
 -- %library_book / %library_total -- "Book 58 of 545" for the status line.
 --

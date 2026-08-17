@@ -133,6 +133,20 @@ test("library: %library_book is empty for a book outside the library", function(
        "545")
 end)
 
+-- %blank: a section is skipped when its text is empty, so a spacer needs
+-- content that isEmpty does NOT consider empty while still rendering as
+-- nothing. U+00A0 fits: Lua's %s is ASCII-only.
+test("blank: %blank survives the empty-section check", function()
+    local out = Tokens.expand("%blank", bookFixture())
+    eq(out, "\xC2\xA0")
+    eq(Tokens.isEmpty(out), false)
+end)
+
+test("blank: a plain space would NOT survive (that's the whole point)", function()
+    eq(Tokens.isEmpty(" "), true)
+    eq(Tokens.isEmpty(""), true)
+end)
+
 test("library: missing state yields empty, not nil", function()
     eq(Tokens.expand("%library_book%library_total", bookFixture(), {}), "")
     eq(Tokens.expand("%library_book%library_total", bookFixture()), "")
