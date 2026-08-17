@@ -917,6 +917,34 @@ function Bookshelf:onDispatcherRegisterActions()
         title    = _("Bookshelf: open bulk action menu"),
         general  = true,
     })
+    -- One action per chip, so "take me to Favourites" is a single gesture
+    -- instead of open-then-page-through-chips. next/prev chip already exist,
+    -- but they step; landing directly is what a shortcut is for. Same shape
+    -- the Profiles plugin uses to expose each profile (event + arg).
+    --
+    -- Registered from the CURRENT tab set, so custom and renamed chips get an
+    -- action too. Actions are keyed by chip id: renaming a chip keeps its
+    -- binding, deleting one drops the action on the next start (the gesture
+    -- then does nothing rather than jumping somewhere wrong).
+    do
+        local ok_tabs, TabModel = pcall(require, "lib/bookshelf_tab_model")
+        if ok_tabs and TabModel and TabModel.getActive then
+            local ok_list, tabs = pcall(TabModel.getActive)
+            if ok_list and type(tabs) == "table" then
+                for _i, tab in ipairs(tabs) do
+                    if type(tab) == "table" and type(tab.id) == "string" and tab.id ~= "" then
+                        Dispatcher:registerAction("bookshelf_chip_" .. tab.id, {
+                            category = "none",
+                            event    = "BookshelfGotoChip",
+                            arg      = tab.id,
+                            title    = T(_("Bookshelf: go to %1"), tab.label or tab.id),
+                            general  = true,
+                        })
+                    end
+                end
+            end
+        end
+    end
     -- Open the start menu / full-screen micro-module view by gesture, so they're
     -- reachable in the reader without the launcher buttons shown (or in the
     -- library). A bound gesture is an explicit request, so it opens regardless
@@ -1462,6 +1490,24 @@ end
 
 -- Explicit show/hide — used by the Set Bookshelf action with on/off args.
 -- Hide is a no-op when nothing's showing, mirroring how Set Bookends behaves.
+--- Jump straight to one chip, opening the shelf if it isn't up.
+--- Registered per chip in onDispatcherRegisterActions above.
+function Bookshelf:onBookshelfGotoChip(chip_id)
+    if type(chip_id) ~= "string" or chip_id == "" then return true end
+    -- Persist BEFORE showing: a shelf that isn't up yet reads active_chip
+    -- while building, so it lands on the right chip directly instead of
+    -- building the old one and switching visibly afterwards.
+    BookshelfSettings.save("active_chip", chip_id)
+    self:onSetBookshelf(true)
+    -- Already showing: the stored value alone doesn't move it, so switch the
+    -- live widget too. _selectChip also resets drill path, cursor and page,
+    -- which is what "go to this chip" should mean.
+    if _live_widget and _live_widget._selectChip then
+        pcall(function() _live_widget:_selectChip(chip_id) end)
+    end
+    return true
+end
+
 function Bookshelf:onSetBookshelf(visible)
     -- Hot parking: the shelf is already the visible layer over a parked
     -- reader. "on" is a no-op; "off" returns to the parked book.
