@@ -2058,6 +2058,39 @@ function Repo.getAllFilepaths()
     return paths
 end
 
+--- Library order for %library_book: filepath -> 1-based position across the
+--- WHOLE library, oldest file first, so a book keeps its number no matter which
+--- chip, filter or collection it was opened from. Returns the map and the count.
+---
+--- Ordered by file mtime -- "when it landed on the device", which is what a
+--- Calibre transfer stamps. Ties break on the filepath, and that matters more
+--- than it looks: a bulk transfer gives hundreds of books near-identical mtimes,
+--- and without a second key their order (and therefore every number) could
+--- shuffle between calls.
+---
+--- Rides the same cached walk as getAllFilepaths, but copies before sorting --
+--- cachedWalk hands back its cached table, and sorting in place would reorder it
+--- underneath every other consumer.
+function Repo.getLibraryOrder()
+    local home  = G_reader_settings:readSetting("home_dir") or "/"
+    local depth = BookshelfSettings.read("latest_walk_depth") or 3
+    local sorted = {}
+    for _i, c in ipairs(cachedWalk(home, depth)) do
+        if type(c) == "table" and type(c.fp) == "string" then
+            sorted[#sorted + 1] = { fp = c.fp, mtime = c.mtime or 0 }
+        elseif type(c) == "string" then
+            sorted[#sorted + 1] = { fp = c, mtime = 0 }
+        end
+    end
+    table.sort(sorted, function(a, b)
+        if a.mtime ~= b.mtime then return a.mtime < b.mtime end
+        return a.fp < b.fp
+    end)
+    local map = {}
+    for i, c in ipairs(sorted) do map[c.fp] = i end
+    return map, #sorted
+end
+
 function Repo.getLatest(limit, offset, opts)
     local _t0 = _gettime()
     local home       = G_reader_settings:readSetting("home_dir") or "/"

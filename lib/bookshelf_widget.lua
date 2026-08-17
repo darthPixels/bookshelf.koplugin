@@ -2969,33 +2969,21 @@ local function _readSlowState(now)
             end
         end
     end
-    -- Library size for %library_total: every book in the library, independent
-    -- of the active chip or filter. Belongs in the SLOW tier -- the number only
-    -- moves when books are added or removed, and although getAllFilepaths sits
-    -- on the cached directory walk it still builds a fresh path list per call,
-    -- which has no business running on every status-line repaint.
-    local ok_lib, n = pcall(function() return #Repo.getAllFilepaths() end)
-    if ok_lib and type(n) == "number" then out.library_total = n end
+    -- %library_total and %library_book: the whole library, independent of chip,
+    -- filter or collection. The status line reports global state, so a count
+    -- that moved with a filter would be reporting something other than it says.
+    --
+    -- SLOW tier on purpose: both only change when books are added or removed.
+    -- The walk itself is cached, but sorting it into an order map is real work
+    -- and has no business running on every status-line repaint.
+    local ok_lib, order, n = pcall(Repo.getLibraryOrder)
+    if ok_lib and type(order) == "table" then
+        out.library_order = order
+        out.library_total = n
+    end
     _device_slow_cache      = out
     _device_slow_expires_at = now + DEVICE_SLOW_TTL
     return out
-end
-
--- Stamp the shelf position fields onto a device-state table. Deliberately
--- OUTSIDE the cache: hardware reads survive a TTL, but the page and the item
--- under the hero change with every flip and tap, so a cached position would
--- freeze at whatever was showing when the cache filled. Same reason `now` is
--- re-stamped on the cache-hit path.
---
--- The page's items and the cursor travel along rather than a finished number,
--- because the position depends on WHICH book is being rendered -- and that is
--- only known in the token expander, not here.
-function BookshelfWidget:_stampShelfPosition(state)
-    if type(state) ~= "table" then return state end
-    state.shelf_total  = self._total_items
-    state.shelf_items  = self._page_items
-    state.shelf_cursor = self._cursor
-    return state
 end
 
 function BookshelfWidget:_buildDeviceState()
@@ -3004,7 +2992,7 @@ function BookshelfWidget:_buildDeviceState()
         -- Mutate `now` in the returned table so token rendering sees the
         -- current second; everything else (hardware reads) is fine to keep.
         _device_state_cache.now = now
-        return self:_stampShelfPosition(_device_state_cache)
+        return _device_state_cache
     end
 
     local ok_pd, PowerD = pcall(function()
@@ -3069,9 +3057,10 @@ function BookshelfWidget:_buildDeviceState()
         ram_mib  = slow.ram_mib,
         disk_free= slow.disk_free,
         library_total = slow.library_total,
+        library_order = slow.library_order,
     }
     _device_state_expires_at = now + DEVICE_STATE_TTL
-    return self:_stampShelfPosition(_device_state_cache)
+    return _device_state_cache
 end
 
 -- ─── Navigation ───────────────────────────────────────────────────────────────

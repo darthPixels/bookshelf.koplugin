@@ -98,74 +98,44 @@ test("metadata: %published_year survives alongside other tokens", function()
     eq(Tokens.expand("%series_name #%series_num, %published_year", bookFixture()),
        "Dune #1, 1965")
 end)
--- %shelf_pos / %shelf_total: "book 3 of 545". The host stamps the page's items
--- plus the cursor (1-based index of the page's first item) onto the state.
-local function shelfState(cursor, total, filepaths)
-    local items = {}
-    for i, fp in ipairs(filepaths or {}) do items[i] = { filepath = fp } end
-    return { shelf_cursor = cursor, shelf_total = total, shelf_items = items }
+-- %library_book / %library_total: "Book 58 of 545". The host resolves the
+-- library into a filepath -> position map once per slow-tier refresh; the
+-- expander only looks the book up.
+local function libraryState(total, order)
+    return { library_total = total, library_order = order or {} }
 end
 
-test("shelf: %shelf_pos finds the book on the first page", function()
-    local b = bookFixture(); b.filepath = "/b/second.epub"
-    eq(Tokens.expand("%shelf_pos", b,
-        shelfState(1, 545, { "/b/first.epub", "/b/second.epub" })), "2")
+test("library: %library_book reports the book's library number", function()
+    local b = bookFixture(); b.filepath = "/b/x.epub"
+    eq(Tokens.expand("%library_book", b,
+        libraryState(545, { ["/b/x.epub"] = 58 })), "58")
 end)
 
--- The cursor offsets the page: item 2 of a page starting at 41 is book 42.
-test("shelf: %shelf_pos accounts for the page offset", function()
-    local b = bookFixture(); b.filepath = "/b/second.epub"
-    eq(Tokens.expand("%shelf_pos", b,
-        shelfState(41, 545, { "/b/first.epub", "/b/second.epub" })), "42")
+test("library: %library_total reports the library size", function()
+    eq(Tokens.expand("%library_total", bookFixture(), libraryState(545)), "545")
 end)
 
--- The hero can show the last-read book while the shelf sits on another page.
--- Empty beats a wrong number, and [if:] can gate it.
-test("shelf: %shelf_pos is empty when the book isn't on the page", function()
-    local b = bookFixture(); b.filepath = "/b/elsewhere.epub"
-    local st = shelfState(1, 545, { "/b/first.epub", "/b/second.epub" })
-    eq(Tokens.expand("%shelf_pos", b, st), "")
-    eq(Tokens.expand("[if:shelf_pos](%shelf_pos)[/if]", b, st), "")
+-- The whole point: the number belongs to the BOOK, not to where it was tapped.
+-- Third cover under Favourites, still 58 of 545.
+test("library: the number ignores which shelf the book was opened from", function()
+    local b = bookFixture(); b.filepath = "/b/x.epub"
+    local st = libraryState(545, { ["/b/x.epub"] = 58 })
+    eq(Tokens.expand("Book %library_book of %library_total", b, st), "Book 58 of 545")
 end)
 
-test("shelf: %shelf_total reports the shelf size", function()
-    eq(Tokens.expand("%shelf_total", bookFixture(), shelfState(1, 545, {})), "545")
+-- Books outside the walked library (OPDS records, files below the walk depth)
+-- have no number; empty beats inventing one, and [if:] gates it.
+test("library: %library_book is empty for a book outside the library", function()
+    local b = bookFixture(); b.filepath = "/elsewhere/y.epub"
+    local st = libraryState(545, { ["/b/x.epub"] = 58 })
+    eq(Tokens.expand("%library_book", b, st), "")
+    eq(Tokens.expand("[if:library_book]Book %library_book of [/if]%library_total", b, st),
+       "545")
 end)
 
-test("shelf: the whole \"3 of 545\" line", function()
-    local b = bookFixture(); b.filepath = "/b/third.epub"
-    eq(Tokens.expand("%shelf_pos of %shelf_total", b,
-        shelfState(1, 545, { "/b/a.epub", "/b/b.epub", "/b/third.epub" })),
-       "3 of 545")
-end)
-
--- No state at all (a renderer that never stamped) must not error or print nil.
-test("shelf: missing state yields empty, not nil", function()
-    eq(Tokens.expand("%shelf_pos%shelf_total", bookFixture(), {}), "")
-    eq(Tokens.expand("%shelf_pos%shelf_total", bookFixture()), "")
-end)
-
--- %library_total is the whole library and must NOT follow the shelf: the status
--- line reports global state, so a count that shrank under a filter would be
--- reporting something else than it claims.
-test("library: %library_total ignores the shelf count", function()
-    local st = shelfState(1, 37, { "/b/a.epub" })   -- filtered shelf: 37
-    st.library_total = 545                           -- library: 545
-    eq(Tokens.expand("%library_total", bookFixture(), st), "545")
-    eq(Tokens.expand("%shelf_total", bookFixture(), st), "37")
-end)
-
-test("library: %library_total is empty when unknown", function()
-    eq(Tokens.expand("%library_total", bookFixture(), {}), "")
-    eq(Tokens.expand("%library_total", bookFixture()), "")
-end)
-
--- The status-line template the user actually wants.
-test("library: \"Book 3 of 545\" for the status line", function()
-    local b = bookFixture(); b.filepath = "/b/third.epub"
-    local st = shelfState(1, 545, { "/b/a.epub", "/b/b.epub", "/b/third.epub" })
-    st.library_total = 545
-    eq(Tokens.expand("Book %shelf_pos of %library_total", b, st), "Book 3 of 545")
+test("library: missing state yields empty, not nil", function()
+    eq(Tokens.expand("%library_book%library_total", bookFixture(), {}), "")
+    eq(Tokens.expand("%library_book%library_total", bookFixture()), "")
 end)
 
 test("metadata: %hardcover_rating formats cached rating", function()

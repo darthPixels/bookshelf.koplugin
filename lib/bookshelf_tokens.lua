@@ -75,9 +75,8 @@ Tokens.CATALOGUE = {
     { category = "Book",     token = "%quote_source",     description = _("The book and author for %quote") },
     { category = "Book",     token = "%lang",             description = _("Language") },
     { category = "Book",     token = "%published_year",   description = _("Publication year (needs Calibre metadata)") },
-    { category = "Book",     token = "%shelf_pos",        description = _("Position of this book in the current shelf (e.g. 3)") },
-    { category = "Book",     token = "%shelf_total",      description = _("Books in the current shelf — follows chip and filter") },
-    { category = "Device",   token = "%library_total",    description = _("Books in the whole library — ignores chip and filter") },
+    { category = "Device",   token = "%library_book",     description = _("This book's number in the library, oldest transfer first (e.g. 58)") },
+    { category = "Device",   token = "%library_total",    description = _("Books in the whole library (e.g. 545)") },
     { category = "Progress", token = "%book_pct",         description = _("Percent read") },
     { category = "Progress", token = "%book_pct_left",    description = _("Percent left") },
     { category = "Progress", token = "%page_num",         description = _("Current page") },
@@ -217,42 +216,29 @@ Tokens.expanders.format      = metaToken("format")
 -- Empty for non-Calibre libraries, so [if:published_year]…[/if] gates it.
 Tokens.expanders.published_year = metaToken("published_year")
 
--- %shelf_pos / %shelf_total -- "book 3 of 545" for a status line.
+-- %library_book / %library_total -- "Book 58 of 545" for the status line.
 --
--- The counts follow the CURRENT shelf, i.e. whatever the active chip and any
--- filter are showing: with no filter that is the whole library, with one it is
--- what's on screen. Counting the library while showing 20 filtered books would
--- put a number next to a list it doesn't describe.
+-- Both are LIBRARY-WIDE and ignore the chip, filter or collection the book was
+-- opened from: tapping the third cover under Favourites still reads 58, because
+-- that book is the 58th in the library. The status line reports global state
+-- (clock, battery, wifi, free space); a number that moved with a filter would
+-- be reporting something other than what it says.
 --
--- The position is resolved here rather than handed over ready-made because it
--- depends on which book is being rendered. The host stamps the page's items and
--- the cursor (the 1-based index of the page's first item) onto the state; the
--- book is located by filepath within that page. A book that is NOT on the
--- current page -- the hero can show the last-read book while the shelf sits
--- elsewhere -- yields empty rather than a wrong number, so
--- [if:shelf_pos]…[/if] gates it away.
-Tokens.expanders.shelf_pos = function(book, state)
+-- Order is by file mtime, oldest first -- "when it landed on the device", which
+-- is what a Calibre transfer stamps. The host resolves that once per slow-tier
+-- refresh into a filepath -> position map (Repo.getLibraryOrder); the expander
+-- only looks the book up.
+--
+-- Empty for a book outside the walked library (an OPDS record, a file below the
+-- walk depth), so [if:library_book]…[/if] can gate it away.
+Tokens.expanders.library_book = function(book, state)
     if not (book and book.filepath and type(state) == "table") then return "" end
-    local items, cursor = state.shelf_items, tonumber(state.shelf_cursor)
-    if type(items) ~= "table" or not cursor then return "" end
-    for i = 1, #items do
-        local it = items[i]
-        if it and it.filepath == book.filepath then
-            return tostring(cursor + i - 1)
-        end
-    end
-    return ""
-end
-
-Tokens.expanders.shelf_total = function(_book, state)
-    local n = type(state) == "table" and tonumber(state.shelf_total)
+    local order = state.library_order
+    if type(order) ~= "table" then return "" end
+    local n = tonumber(order[book.filepath])
     return n and tostring(n) or ""
 end
 
--- %library_total -- every book in the library, whatever the shelf is currently
--- showing. This is the one for a status line: that strip reports global state
--- (clock, battery, wifi), so a book count that shrank to 37 whenever a filter
--- was active would be reporting something else entirely.
 Tokens.expanders.library_total = function(_book, state)
     local n = type(state) == "table" and tonumber(state.library_total)
     return n and tostring(n) or ""
