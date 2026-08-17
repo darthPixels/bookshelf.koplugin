@@ -75,6 +75,8 @@ Tokens.CATALOGUE = {
     { category = "Book",     token = "%quote_source",     description = _("The book and author for %quote") },
     { category = "Book",     token = "%lang",             description = _("Language") },
     { category = "Book",     token = "%published_year",   description = _("Publication year (needs Calibre metadata)") },
+    { category = "Book",     token = "%shelf_pos",        description = _("Position of this book in the current shelf (e.g. 3)") },
+    { category = "Book",     token = "%shelf_total",      description = _("Number of books in the current shelf (e.g. 545)") },
     { category = "Progress", token = "%book_pct",         description = _("Percent read") },
     { category = "Progress", token = "%book_pct_left",    description = _("Percent left") },
     { category = "Progress", token = "%page_num",         description = _("Current page") },
@@ -213,6 +215,38 @@ Tokens.expanders.lang        = metaToken("lang")
 Tokens.expanders.format      = metaToken("format")
 -- Empty for non-Calibre libraries, so [if:published_year]…[/if] gates it.
 Tokens.expanders.published_year = metaToken("published_year")
+
+-- %shelf_pos / %shelf_total -- "book 3 of 545" for a status line.
+--
+-- The counts follow the CURRENT shelf, i.e. whatever the active chip and any
+-- filter are showing: with no filter that is the whole library, with one it is
+-- what's on screen. Counting the library while showing 20 filtered books would
+-- put a number next to a list it doesn't describe.
+--
+-- The position is resolved here rather than handed over ready-made because it
+-- depends on which book is being rendered. The host stamps the page's items and
+-- the cursor (the 1-based index of the page's first item) onto the state; the
+-- book is located by filepath within that page. A book that is NOT on the
+-- current page -- the hero can show the last-read book while the shelf sits
+-- elsewhere -- yields empty rather than a wrong number, so
+-- [if:shelf_pos]…[/if] gates it away.
+Tokens.expanders.shelf_pos = function(book, state)
+    if not (book and book.filepath and type(state) == "table") then return "" end
+    local items, cursor = state.shelf_items, tonumber(state.shelf_cursor)
+    if type(items) ~= "table" or not cursor then return "" end
+    for i = 1, #items do
+        local it = items[i]
+        if it and it.filepath == book.filepath then
+            return tostring(cursor + i - 1)
+        end
+    end
+    return ""
+end
+
+Tokens.expanders.shelf_total = function(_book, state)
+    local n = type(state) == "table" and tonumber(state.shelf_total)
+    return n and tostring(n) or ""
+end
 -- %rating -> N filled stars + (5-N) empty stars. Rating is stored
 -- 1-5 (integer) in the DocSettings summary; book.rating is hydrated
 -- by Repo.readProgress via buildBook. Returns empty for unrated /

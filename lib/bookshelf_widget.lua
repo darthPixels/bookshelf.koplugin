@@ -2974,13 +2974,30 @@ local function _readSlowState(now)
     return out
 end
 
+-- Stamp the shelf position fields onto a device-state table. Deliberately
+-- OUTSIDE the cache: hardware reads survive a TTL, but the page and the item
+-- under the hero change with every flip and tap, so a cached position would
+-- freeze at whatever was showing when the cache filled. Same reason `now` is
+-- re-stamped on the cache-hit path.
+--
+-- The page's items and the cursor travel along rather than a finished number,
+-- because the position depends on WHICH book is being rendered -- and that is
+-- only known in the token expander, not here.
+function BookshelfWidget:_stampShelfPosition(state)
+    if type(state) ~= "table" then return state end
+    state.shelf_total  = self._total_items
+    state.shelf_items  = self._page_items
+    state.shelf_cursor = self._cursor
+    return state
+end
+
 function BookshelfWidget:_buildDeviceState()
     local now = os.time()
     if _device_state_cache and _device_state_expires_at > now then
         -- Mutate `now` in the returned table so token rendering sees the
         -- current second; everything else (hardware reads) is fine to keep.
         _device_state_cache.now = now
-        return _device_state_cache
+        return self:_stampShelfPosition(_device_state_cache)
     end
 
     local ok_pd, PowerD = pcall(function()
@@ -3046,7 +3063,7 @@ function BookshelfWidget:_buildDeviceState()
         disk_free= slow.disk_free,
     }
     _device_state_expires_at = now + DEVICE_STATE_TTL
-    return _device_state_cache
+    return self:_stampShelfPosition(_device_state_cache)
 end
 
 -- ─── Navigation ───────────────────────────────────────────────────────────────

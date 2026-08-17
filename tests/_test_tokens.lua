@@ -98,6 +98,53 @@ test("metadata: %published_year survives alongside other tokens", function()
     eq(Tokens.expand("%series_name #%series_num, %published_year", bookFixture()),
        "Dune #1, 1965")
 end)
+-- %shelf_pos / %shelf_total: "book 3 of 545". The host stamps the page's items
+-- plus the cursor (1-based index of the page's first item) onto the state.
+local function shelfState(cursor, total, filepaths)
+    local items = {}
+    for i, fp in ipairs(filepaths or {}) do items[i] = { filepath = fp } end
+    return { shelf_cursor = cursor, shelf_total = total, shelf_items = items }
+end
+
+test("shelf: %shelf_pos finds the book on the first page", function()
+    local b = bookFixture(); b.filepath = "/b/second.epub"
+    eq(Tokens.expand("%shelf_pos", b,
+        shelfState(1, 545, { "/b/first.epub", "/b/second.epub" })), "2")
+end)
+
+-- The cursor offsets the page: item 2 of a page starting at 41 is book 42.
+test("shelf: %shelf_pos accounts for the page offset", function()
+    local b = bookFixture(); b.filepath = "/b/second.epub"
+    eq(Tokens.expand("%shelf_pos", b,
+        shelfState(41, 545, { "/b/first.epub", "/b/second.epub" })), "42")
+end)
+
+-- The hero can show the last-read book while the shelf sits on another page.
+-- Empty beats a wrong number, and [if:] can gate it.
+test("shelf: %shelf_pos is empty when the book isn't on the page", function()
+    local b = bookFixture(); b.filepath = "/b/elsewhere.epub"
+    local st = shelfState(1, 545, { "/b/first.epub", "/b/second.epub" })
+    eq(Tokens.expand("%shelf_pos", b, st), "")
+    eq(Tokens.expand("[if:shelf_pos](%shelf_pos)[/if]", b, st), "")
+end)
+
+test("shelf: %shelf_total reports the shelf size", function()
+    eq(Tokens.expand("%shelf_total", bookFixture(), shelfState(1, 545, {})), "545")
+end)
+
+test("shelf: the whole \"3 of 545\" line", function()
+    local b = bookFixture(); b.filepath = "/b/third.epub"
+    eq(Tokens.expand("%shelf_pos of %shelf_total", b,
+        shelfState(1, 545, { "/b/a.epub", "/b/b.epub", "/b/third.epub" })),
+       "3 of 545")
+end)
+
+-- No state at all (a renderer that never stamped) must not error or print nil.
+test("shelf: missing state yields empty, not nil", function()
+    eq(Tokens.expand("%shelf_pos%shelf_total", bookFixture(), {}), "")
+    eq(Tokens.expand("%shelf_pos%shelf_total", bookFixture()), "")
+end)
+
 test("metadata: %hardcover_rating formats cached rating", function()
     local b = bookFixture(); b.hardcover_rating = 4.5
     eq(Tokens.expand("%hardcover_rating", b), "4.5")
